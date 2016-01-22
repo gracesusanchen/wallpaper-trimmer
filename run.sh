@@ -1,26 +1,17 @@
 #!/bin/bash
-DIRECTORY=~/Dropbox/Wallpaper/
-PREFIX="CHECKED_"
-REVIEW_FOLDER=Review
-LOG=./auto_delete_log.txt
-
-MIN_SIZE_IN_BYTES=200000 #200KB
-MAX_SIZE_IN_BYTES=8000000 #8MB
-MIN_WIDTH=1200
-MIN_HEIGHT=600
-MIN_RESOLUTION=72
+source ./config.sh
 
 function tagForReview {
 	echo -e "${1}\t${2}" >> $LOG;
-	mv $1 $REVIEW_FOLDER;
+	mv "$1" $review_folder_name;
 }
 function tagForRemoval {
 	echo -e "${1}\t${2}" >> $LOG;
-	rm $1;
+	rm "$1";
 }
 function floor {
-	RETURN=$(python -c "from math import floor; print floor($1)")
-	echo "${RETURN/\.0/""}"
+	decimal=$(python -c "from math import floor; print floor($1)")
+	echo "${decimal/\.0/""}"
 }
 function pruneName {
 	# get rid of extra strings in filename
@@ -34,52 +25,52 @@ function pruneName {
 function tidyName {
 	extension=$(echo ${1##*.})
 	filename=$(echo ${1%.*})
-		
+
 	pruned=$(pruneName ${filename});
-	fullname=${PREFIX}${pruned}.${extension}
-	mv $1 $fullname
+	fullname=${checked_file_prefix}${pruned}.${extension}
+	mv "$1" $fullname
 }
 
-FILE_COUNT=$(ls -B "$DIRECTORY" | wc -l)
-echo "$FILE_COUNT files"
+FILE_COUNT=$(ls -B "$directory" | wc -l)
+echo "You currently have $FILE_COUNT wallpapers"
 
-cd $DIRECTORY;
-mkdir -p $REVIEW_FOLDER;
+cd $directory;
+mkdir -p $review_folder_name;
 for f in *; 
 	do 
 	((COUNTER++))
-	
+
 	if [ -d "${f}" ] ; then
 		continue;
 	fi
-	if [[ $f == ${PREFIX}* ]] ; then
+	if [[ $f == ${checked_file_prefix}* ]] ; then
 		continue;
 	fi
 
-	SIZE_IN_BYTES=$(identify -format "%b" $f)
+	SIZE_IN_BYTES=$(identify -format "%b" "$f")
 	SIZE_IN_BYTES="${SIZE_IN_BYTES/B/""}"
-	WIDTH=$(identify -format "%w" $f)
-	HEIGHT=$(identify -format "%h" $f)
-	RESOLUTION=$(identify -format "%[resolution.x]" $f)
+	WIDTH=$(identify -format "%w" "$f")
+	HEIGHT=$(identify -format "%h" "$f")
+	RESOLUTION=$(identify -format "%[resolution.x]" "$f")
 	RESOLUTION=$(floor $RESOLUTION)
 
 	if [ "$WIDTH" -lt "$HEIGHT" ]; then
-		tagForRemoval ${f} "Is portrait.";
+		tagForRemoval "$f" "Is portrait.";
 	elif [ "$SIZE_IN_BYTES" -lt "$MIN_SIZE_IN_BYTES" ]; then
-		tagForRemoval ${f} "Size too small.";
+		tagForRemoval "$f" "Size too small.";
 	elif [ "$SIZE_IN_BYTES" -gt "$MAX_SIZE_IN_BYTES" ]; then
-		tagForReview ${f} "Size too big.";
+		tagForReview "$f" "Size too big.";
 	elif [ "$WIDTH" -lt "$MIN_WIDTH" ]; then
-		tagForRemoval ${f} "Width too small. $WIDTH";
+		tagForRemoval "$f" "Width too small. $WIDTH";
 	elif [ "$HEIGHT" -lt "$MIN_HEIGHT" ]; then
-		tagForRemoval ${f} "Height too small. $HEIGHT";
+		tagForRemoval "$f" "Height too small. $HEIGHT";
 	elif [ "$RESOLUTION" -lt "$MIN_RESOLUTION" ]; then
-		tagForReview ${f} "Resolution=${RESOLUTION}.";
+		tagForReview "$f" "Resolution=${RESOLUTION}.";
 	else
 		echo "Processing $COUNTER/$FILE_COUNT..";
-		tidyName ${f};
+		tidyName "$f";
 	fi
 done
 
-echo "Checking for duplicates..."
-fdupes -r .
+echo "Removing duplicates..."
+fdupes -r --delete .
